@@ -1,0 +1,46 @@
+Combined_MFCC_Matrix_with_Labels <- read.csv("Combined_MFCC_Matrix_with_Labels.csv")
+Combined_MFCC_Matrix_with_Labels <- Combined_MFCC_Matrix_with_Labels |>
+  mutate(IS_HONK = as.factor(IS_HONK))
+#Create the IS_HONK column as a binary factor, with 0 being false and 1 being true. needed when classifying
+
+
+set.seed(123)
+splitdata <- initial_split(Combined_MFCC_Matrix_with_Labels, prop = 0.75, strata = IS_HONK)
+trainingdata <- training(splitdata)
+testdata  <- testing(splitdata)
+#create testing and training data by splitting it 75/25.
+
+rec <- recipe(IS_HONK ~ MFCC_1 + MFCC_5, data = trainingdata) |>
+  step_mutate(
+    MFCC_1 = as.numeric(as.character(MFCC_1)),
+    MFCC_5 = as.numeric(as.character(MFCC_5))
+  ) |>
+  step_normalize(all_predictors())
+#chat gpt helped classify columns
+
+logisticmodel <- logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification")
+#create logistic model
+
+modelworkflow <- workflow() |>
+  add_model(logisticmodel) |>
+  add_recipe(rec)
+#create workflow
+
+set.seed(123)
+folds <- vfold_cv(trainingdata, v = 10, strata = IS_HONK)
+#10-fold cross validation on model
+
+results <- fit_resamples(
+  modelworkflow,
+  resamples = folds,
+  metrics = metric_set(accuracy),
+  control = control_resamples(save_pred = TRUE)
+)
+#compute model performance across metrics
+
+
+
+collect_metrics(results)
+#see performance metrics
