@@ -1,0 +1,35 @@
+trainingdata <- trainingdata |>
+  mutate(across(c(MFCC_1, MFCC_3, MFCC_4, MFCC_5, MFCC_7), ~ as.numeric(as.character(.))))
+
+testdata <- testdata |>
+  mutate(across(c(MFCC_1, MFCC_3, MFCC_4, MFCC_5, MFCC_7), ~ as.numeric(as.character(.))))
+
+rec <- recipe(IS_HONK ~ MFCC_1 + MFCC_3 + MFCC_4 + MFCC_5 + MFCC_7, data = trainingdata) |>
+  step_normalize(all_predictors())
+#create recipe
+
+rf_model <- rand_forest(
+  mtry = 3,
+  min_n = 7,
+  trees = 500
+) |>
+  set_engine("ranger") |>
+  set_mode("classification")
+#create model using tested params
+
+rf_workflow <- workflow() |>
+  add_model(rf_model) |>
+  add_recipe(rec)
+#create workflow
+
+final_fit <- fit(rf_workflow, data = trainingdata)
+#fit workflow from training data
+
+test_predictions <- predict(final_fit, new_data = testdata) |>
+  bind_cols(testdata)
+#use fitted data on testing data
+
+metrics(test_predictions, truth = IS_HONK, estimate = .pred_class)
+#create metrics for testing outcomes
+
+conf_mat(test_predictions, truth = IS_HONK, estimate = .pred_class)
