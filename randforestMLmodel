@@ -1,0 +1,40 @@
+
+registerDoParallel(cores = parallel::detectCores() - 1)
+#searched up ways to make computation faster and ended up doing parallel processing
+
+trainingdata <- trainingdata |>
+  mutate(across(c(MFCC_1, MFCC_3, MFCC_4, MFCC_5, MFCC_7), ~ as.numeric(as.character(.))))
+#something happened, so had to add this code in here to convert MFCC values back to numeric
+
+rec <- recipe(IS_HONK ~ MFCC_1 + MFCC_3 + MFCC_4 + MFCC_5 + MFCC_7, data = trainingdata) |>
+  step_normalize(all_predictors())
+#create recipe
+
+rf_model <- rand_forest(
+  mtry = 3,
+  min_n = 7,
+  trees = 500
+) |>
+  set_engine("ranger") |>
+  set_mode("classification")
+#create model with best parameters
+
+rf_workflow <- workflow() |>
+  add_model(rf_model) |>
+  add_recipe(rec)
+#final workflow
+
+set.seed(123)
+folds <- vfold_cv(trainingdata, v = 10, strata = IS_HONK)
+#set up 10-fold cross val
+
+final_cv_results <- fit_resamples(
+  rf_workflow,
+  resamples = folds,
+  metrics = metric_set(accuracy, precision, recall, f_meas),
+  control = control_resamples(verbose = TRUE)
+)
+#this was done by gpt, i dont know what verbose means
+
+collect_metrics(final_cv_results)
+#show metrics
